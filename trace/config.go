@@ -79,13 +79,16 @@ type Config struct {
 	RedactThresholdBytes int64 `mapstructure:"redact_threshold_bytes"`
 }
 
+// userAgentHeader is the canonical header name for the client's user agent.
+const userAgentHeader = "User-Agent"
+
 // DefaultHeaderAllowlist is deliberately small and credential-free.
 var DefaultHeaderAllowlist = []string{
 	"Content-Type",
 	"Content-Encoding",
 	"Content-Length",
 	"Accept",
-	"User-Agent",
+	userAgentHeader,
 	"SOAPAction",
 	"MS-ASProtocolVersion",
 	"X-Forwarded-For",
