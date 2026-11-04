@@ -1,5 +1,17 @@
 # pitrace
 
+<!-- badges:start -->
+[![Go Reference](https://pkg.go.dev/badge/go.pilab.hu/cloud/pitrace.svg)](https://pkg.go.dev/go.pilab.hu/cloud/pitrace)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pilab-cloud/pitrace)](https://goreportcard.com/report/github.com/pilab-cloud/pitrace)
+[![CI](https://github.com/pilab-cloud/pitrace/actions/workflows/ci.yml/badge.svg)](https://github.com/pilab-cloud/pitrace/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/pilab-cloud/pitrace/actions/workflows/codeql.yml/badge.svg)](https://github.com/pilab-cloud/pitrace/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/pilab-cloud/pitrace)](https://github.com/pilab-cloud/pitrace/releases)
+[![Coverage](https://codecov.io/gh/pilab-cloud/pitrace/branch/main/graph/badge.svg)](https://codecov.io/gh/pilab-cloud/pitrace)
+[![License](https://img.shields.io/github/license/pilab-cloud/pitrace)](https://github.com/pilab-cloud/pitrace/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/dl/)
+[![Website](https://img.shields.io/badge/website-pilab.hu-blue)](https://pilab.hu)
+<!-- badges:end -->
+
 Reusable request/response tracing module for Go services.
 
 Extracted from pimail's trace subsystem. Provides:
