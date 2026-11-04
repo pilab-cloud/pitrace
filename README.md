@@ -5,6 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/pilab-cloud/pitrace)](https://goreportcard.com/report/github.com/pilab-cloud/pitrace)
 [![CI](https://github.com/pilab-cloud/pitrace/actions/workflows/ci.yml/badge.svg)](https://github.com/pilab-cloud/pitrace/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/pilab-cloud/pitrace/actions/workflows/codeql.yml/badge.svg)](https://github.com/pilab-cloud/pitrace/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/pilab-cloud/pitrace/badge)](https://scorecard.dev/viewer/?uri=github.com/pilab-cloud/pitrace)
 [![Release](https://img.shields.io/github/v/release/pilab-cloud/pitrace)](https://github.com/pilab-cloud/pitrace/releases)
 [![Coverage](https://codecov.io/gh/pilab-cloud/pitrace/branch/main/graph/badge.svg)](https://codecov.io/gh/pilab-cloud/pitrace)
 [![License](https://img.shields.io/github/license/pilab-cloud/pitrace)](https://github.com/pilab-cloud/pitrace/blob/main/LICENSE)
