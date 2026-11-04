@@ -1,0 +1,31 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test / coverage
+*.test
+*.out
+coverage.*
+coverage.html
+
+# Go
+vendor/   # uncomment if you vendor dependencies
+*.log
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Env
+.env
+.env.local
+
+# Generated (buf)
+# gen/   # uncomment if generated code is not committed

@@ -37,7 +37,7 @@ func TestMiddlewareCapturesExchange(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/EWS/Exchange.asmx?x=1", strings.NewReader("<request/>"))
 	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
-	req.Header.Set("User-Agent", "MacOutlook/16.107")
+	req.Header.Set(userAgentHeader, "MacOutlook/16.107")
 	req.Header.Set("Authorization", "Basic c2VjcmV0")
 	req.Header.Set("SOAPAction", "CreateItem")
 	recorder := httptest.NewRecorder()
@@ -211,7 +211,7 @@ func headerCanonicalName(h *tracev1.Header) string {
 	case tracev1.WellKnownHeader_WELL_KNOWN_HEADER_ACCEPT:
 		return "Accept"
 	case tracev1.WellKnownHeader_WELL_KNOWN_HEADER_USER_AGENT:
-		return "User-Agent"
+		return userAgentHeader
 	case tracev1.WellKnownHeader_WELL_KNOWN_HEADER_SOAP_ACTION:
 		return "SOAPAction"
 	case tracev1.WellKnownHeader_WELL_KNOWN_HEADER_MS_AS_PROTOCOL_VERSION:

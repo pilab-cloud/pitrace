@@ -1,19 +1,26 @@
+# Pull Request
+
 ## Summary
 
 <!-- What does this PR do? -->
 
-## Changes
+## Type of change
 
-- 
-
-## Testing
-
-- [ ] `go build ./...`
-- [ ] `go vet ./...`
-- [ ] `go test ./...`
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Docs / chore
 
 ## Checklist
 
-- [ ] Exported symbols are documented
-- [ ] Tests added/updated
-- [ ] README/docs updated if needed
+- [ ] Targets `develop` (or `main` for hotfixes).
+- [ ] `go test -race ./...` passes.
+- [ ] `golangci-lint run` passes.
+- [ ] Exported APIs documented (godoc).
+- [ ] Tests added/updated.
+- [ ] `CHANGELOG.md` updated under `[Unreleased]`.
+- [ ] No breaking change without major version bump.
+
+## Related issues
+
+Closes #

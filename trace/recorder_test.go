@@ -58,7 +58,7 @@ func exchange(id, operation, body, response string, started time.Time) *tracev1.
 			UserAgent:     "MacOutlook/16.107",
 			ResponseCodes: []string{"NoError"},
 		},
-		RequestHeaders: []*tracev1.Header{{Name: "User-Agent", Value: "MacOutlook/16.107"}},
+		RequestHeaders: []*tracev1.Header{{Name: userAgentHeader, Value: "MacOutlook/16.107"}},
 		RequestBody:    []byte(body),
 		ResponseBody:   []byte(response),
 		RequestSha256:  hashHex([]byte(body)),

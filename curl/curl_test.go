@@ -32,13 +32,13 @@ func TestProtoToCurlAndParse(t *testing.T) {
 }
 
 func TestProtoToRequest(t *testing.T) {
-	req := httptest.NewRequest("GET", "https://example.com/x", nil)
+	req := httptest.NewRequest(httpMethodGet, "https://example.com/x", nil)
 	ex := RequestToProto(req, nil, nil, nil)
 	r2, err := ProtoToRequest(ex)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r2.Method != "GET" {
+	if r2.Method != httpMethodGet {
 		t.Fatalf("method %s", r2.Method)
 	}
 }
