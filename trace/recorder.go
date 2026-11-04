@@ -41,8 +41,8 @@ type Recorder struct {
 	subs   map[*subscriber]struct{}
 
 	// Dedup state.
-	mu    sync.Mutex
-	last  map[string]lastHashes
+	mu   sync.Mutex
+	last map[string]lastHashes
 
 	storage Storage
 	now     func() time.Time
@@ -381,5 +381,3 @@ func (r *Recorder) Prune(ctx context.Context, now time.Time) (int, int64, error)
 	}
 	return r.storage.Prune(ctx, now)
 }
-
-

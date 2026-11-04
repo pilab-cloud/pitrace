@@ -29,10 +29,15 @@ import (
 // store segments on a shared filesystem (NFS) or in an S3-compatible bucket
 // (MinIO / silo).
 type Storage interface {
+	// Write persists one exchange.
 	Write(ctx context.Context, ex *tracev1.HTTPExchange) error
+	// Read loads one exchange by trace id.
 	Read(ctx context.Context, traceID string, includeBodies bool) (*tracev1.HTTPExchange, error)
+	// List returns index summaries matching req.
 	List(ctx context.Context, req *tracev1.ListTracesRequest) (*tracev1.ListTracesResponse, error)
+	// Prune removes old/large segments and returns counts.
 	Prune(ctx context.Context, now time.Time) (removed int, freed int64, err error)
+	// Close releases backend resources.
 	Close(ctx context.Context) error
 }
 
@@ -61,6 +66,7 @@ type FileStorage struct {
 	lastPrune atomic.Int64
 }
 
+// NewFileStorage creates a filesystem-backed storage rooted at cfg.Dir.
 func NewFileStorage(cfg Config, logger zerolog.Logger) (*FileStorage, error) {
 	cfg = cfg.withDefaults()
 	if err := ensureDir(cfg.Dir); err != nil {
@@ -78,6 +84,8 @@ func NewFileStorage(cfg Config, logger zerolog.Logger) (*FileStorage, error) {
 	return fs, nil
 }
 
+// Write persists one exchange as a length-prefixed zstd frame and appends an
+// index entry.
 func (f *FileStorage) Write(ctx context.Context, ex *tracev1.HTTPExchange) error {
 	now := f.now()
 	f.mu.Lock()
@@ -113,6 +121,7 @@ func (f *FileStorage) Write(ctx context.Context, ex *tracev1.HTTPExchange) error
 	return nil
 }
 
+// Read loads one exchange by trace id from the filesystem segments.
 func (f *FileStorage) Read(ctx context.Context, traceID string, includeBodies bool) (*tracev1.HTTPExchange, error) {
 	if strings.TrimSpace(traceID) == "" {
 		return nil, ErrTraceNotFound
@@ -179,6 +188,7 @@ func (f *FileStorage) readRecord(entry *indexEntry) (*tracev1.HTTPExchange, erro
 	return ex, nil
 }
 
+// List returns index summaries matching req, newest first.
 func (f *FileStorage) List(ctx context.Context, req *tracev1.ListTracesRequest) (*tracev1.ListTracesResponse, error) {
 	limit := int(req.GetLimit())
 	if limit <= 0 {
@@ -219,6 +229,7 @@ func (f *FileStorage) List(ctx context.Context, req *tracev1.ListTracesRequest) 
 	return &tracev1.ListTracesResponse{Traces: out, Total: uint32(total)}, nil
 }
 
+// Prune deletes whole segments older than MaxAge or over MaxBytes.
 func (f *FileStorage) Prune(ctx context.Context, now time.Time) (int, int64, error) {
 	if now.IsZero() {
 		now = f.now()
@@ -270,6 +281,7 @@ func (f *FileStorage) Prune(ctx context.Context, now time.Time) (int, int64, err
 	return removed, freed, nil
 }
 
+// Close flushes and closes the active segment file.
 func (f *FileStorage) Close(ctx context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -342,6 +354,7 @@ type S3Storage struct {
 	enc    *zstd.Encoder
 }
 
+// NewS3Storage creates an S3-compatible (MinIO/silo) storage backend.
 func NewS3Storage(cfg Config, logger zerolog.Logger, endpoint, accessKey, secretKey, bucket, prefix string, useSSL bool) (*S3Storage, error) {
 	cfg = cfg.withDefaults()
 	client, err := minio.New(endpoint, &minio.Options{
@@ -381,6 +394,7 @@ func (s *S3Storage) indexKey(t time.Time) string {
 	return fmt.Sprintf("%s/index/%s.jsonl", s.prefix, t.UTC().Format("2006-01-02"))
 }
 
+// Write persists one exchange as a zstd object and appends to the daily index.
 func (s *S3Storage) Write(ctx context.Context, ex *tracev1.HTTPExchange) error {
 	payload, err := proto.Marshal(ex)
 	if err != nil {
@@ -416,6 +430,7 @@ func (s *S3Storage) Write(ctx context.Context, ex *tracev1.HTTPExchange) error {
 	return err
 }
 
+// Read loads one exchange by trace id from its S3 object.
 func (s *S3Storage) Read(ctx context.Context, traceID string, includeBodies bool) (*tracev1.HTTPExchange, error) {
 	obj, err := s.client.GetObject(ctx, s.bucket, s.objectKey(traceID), minio.GetObjectOptions{})
 	if err != nil {
@@ -446,6 +461,7 @@ func (s *S3Storage) Read(ctx context.Context, traceID string, includeBodies bool
 	return ex, nil
 }
 
+// List returns index summaries matching req from all daily index objects.
 func (s *S3Storage) List(ctx context.Context, req *tracev1.ListTracesRequest) (*tracev1.ListTracesResponse, error) {
 	// list index objects under prefix/index/
 	var matched []*indexEntry
@@ -495,6 +511,7 @@ func (s *S3Storage) List(ctx context.Context, req *tracev1.ListTracesRequest) (*
 	return &tracev1.ListTracesResponse{Traces: out, Total: uint32(total)}, nil
 }
 
+// Prune removes objects older than MaxAge.
 func (s *S3Storage) Prune(ctx context.Context, now time.Time) (int, int64, error) {
 	// Prune index/record objects older than MaxAge
 	cutoff := now.Add(-s.cfg.MaxAge)
@@ -519,6 +536,7 @@ func (s *S3Storage) Prune(ctx context.Context, now time.Time) (int, int64, error
 	return removed, freed, nil
 }
 
+// Close releases encoder resources.
 func (s *S3Storage) Close(ctx context.Context) error {
 	if s.enc != nil {
 		s.enc.Close()

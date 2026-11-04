@@ -25,6 +25,7 @@ func NewService(recorder *Recorder) *Service {
 	return &Service{recorder: recorder}
 }
 
+// ListTraces returns metadata for matching exchanges, newest first.
 func (s *Service) ListTraces(ctx context.Context, req *tracev1.ListTracesRequest) (*tracev1.ListTracesResponse, error) {
 	if s.recorder == nil {
 		return &tracev1.ListTracesResponse{}, nil
@@ -32,6 +33,7 @@ func (s *Service) ListTraces(ctx context.Context, req *tracev1.ListTracesRequest
 	return s.recorder.List(ctx, req)
 }
 
+// GetTrace returns one exchange, optionally with captured bodies.
 func (s *Service) GetTrace(ctx context.Context, req *tracev1.GetTraceRequest) (*tracev1.GetTraceResponse, error) {
 	id := strings.TrimSpace(req.GetTraceId())
 	if id == "" {
@@ -52,6 +54,7 @@ func (s *Service) GetTrace(ctx context.Context, req *tracev1.GetTraceRequest) (*
 	return &tracev1.GetTraceResponse{Trace: ex}, nil
 }
 
+// TailTraces follows live summaries (no bodies) as they are recorded.
 func (s *Service) TailTraces(req *tracev1.TailTracesRequest, stream tracev1.TraceService_TailTracesServer) error {
 	if s.recorder == nil {
 		return status.Error(codes.Unavailable, "tracing is disabled")

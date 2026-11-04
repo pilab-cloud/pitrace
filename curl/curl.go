@@ -222,5 +222,3 @@ func splitCurl(cmd string) []string {
 	}
 	return out
 }
-
-

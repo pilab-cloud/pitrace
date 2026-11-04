@@ -20,20 +20,56 @@ func NewBuilder() *Builder {
 	}
 }
 
+// WithConfig replaces the whole configuration.
 func (b *Builder) WithConfig(cfg Config) *Builder { b.cfg = cfg; return b }
+
+// WithLogger sets the logger used by the recorder and storage.
 func (b *Builder) WithLogger(l zerolog.Logger) *Builder { b.logger = l; return b }
+
+// WithDir sets the root directory of the trace segments.
 func (b *Builder) WithDir(dir string) *Builder { b.cfg.Dir = dir; return b }
+
+// WithEnabled turns recording on or off.
 func (b *Builder) WithEnabled(v bool) *Builder { b.cfg.Enabled = v; return b }
+
+// WithMaxAge sets the maximum age of retained segments.
 func (b *Builder) WithMaxAge(d time.Duration) *Builder { b.cfg.MaxAge = d; return b }
+
+// WithMaxBytes sets the maximum total size of retained segments.
 func (b *Builder) WithMaxBytes(n int64) *Builder { b.cfg.MaxBytes = n; return b }
+
+// WithQueueSize sets the number of pending records before dropping.
 func (b *Builder) WithQueueSize(n int) *Builder { b.cfg.QueueSize = n; return b }
+
+// WithSampleRatio keeps a fraction of exchanges (1.0 = all).
 func (b *Builder) WithSampleRatio(r float64) *Builder { b.cfg.SampleRatio = r; return b }
-func (b *Builder) WithAlwaysOperations(ops ...string) *Builder { b.cfg.AlwaysOperations = ops; return b }
+
+// WithAlwaysOperations lists operations that are always recorded.
+func (b *Builder) WithAlwaysOperations(ops ...string) *Builder {
+	b.cfg.AlwaysOperations = ops
+	return b
+}
+
+// WithHeaderAllowlist sets the request/response headers copied into a record.
 func (b *Builder) WithHeaderAllowlist(h ...string) *Builder { b.cfg.HeaderAllowlist = h; return b }
+
+// WithRedactUploads enables redaction of request bodies that look like uploads.
 func (b *Builder) WithRedactUploads(v bool) *Builder { b.cfg.RedactUploads = v; return b }
+
+// WithRedactDownloads enables redaction of binary download responses.
 func (b *Builder) WithRedactDownloads(v bool) *Builder { b.cfg.RedactDownloads = v; return b }
-func (b *Builder) WithRedactContentTypes(ct ...string) *Builder { b.cfg.RedactContentTypes = ct; return b }
-func (b *Builder) WithRedactThresholdBytes(n int64) *Builder { b.cfg.RedactThresholdBytes = n; return b }
+
+// WithRedactContentTypes lists content types whose bodies are always redacted.
+func (b *Builder) WithRedactContentTypes(ct ...string) *Builder {
+	b.cfg.RedactContentTypes = ct
+	return b
+}
+
+// WithRedactThresholdBytes redacts bodies larger than n (0 disables).
+func (b *Builder) WithRedactThresholdBytes(n int64) *Builder {
+	b.cfg.RedactThresholdBytes = n
+	return b
+}
 
 // File backend (default)
 func (b *Builder) WithFileStorage() *Builder {

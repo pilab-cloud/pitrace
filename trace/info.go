@@ -16,14 +16,22 @@ const infoContextKey = "pimail.trace.info"
 // The middleware creates it before the handler runs and reads it afterwards;
 // handlers mutate it through the setters below.
 type Info struct {
-	Protocol      string
-	Operation     string
-	AccountID     string
-	Principal     string
+	// Protocol names the protocol ("ews", "jmap", "smtp", ...).
+	Protocol string
+	// Operation names the operation inside the protocol.
+	Operation string
+	// AccountID is the authenticated account.
+	AccountID string
+	// Principal is the authenticated principal/user.
+	Principal string
+	// ClientVersion is a protocol-supplied client version.
 	ClientVersion string
+	// ResponseCodes are protocol result codes.
 	ResponseCodes []string
-	Streamed      bool
-	Labels        map[string]string
+	// Streamed marks long-lived responses.
+	Streamed bool
+	// Labels are searchable metadata attached to the exchange.
+	Labels map[string]string
 }
 
 // InfoFrom returns the exchange info for c, creating it when the middleware is

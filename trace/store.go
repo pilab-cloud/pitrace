@@ -22,33 +22,33 @@ var ErrTraceNotFound = errors.New("trace not found")
 const maxRecordBytes = 512 << 20
 
 type indexEntry struct {
-	TraceID           string    `json:"trace_id"`
-	StartedAt         time.Time `json:"started_at"`
-	DurationMS        int64     `json:"duration_ms"`
-	Protocol          string    `json:"protocol,omitempty"`
-	Operation         string    `json:"operation,omitempty"`
-	AccountID         string    `json:"account_id,omitempty"`
-	Principal         string    `json:"principal,omitempty"`
-	Method            string    `json:"method,omitempty"`
-	Path              string    `json:"path,omitempty"`
-	Status            int32     `json:"status,omitempty"`
-	RequestBytes      int64     `json:"request_bytes,omitempty"`
-	ResponseBytes     int64     `json:"response_bytes,omitempty"`
-	UserAgent         string    `json:"user_agent,omitempty"`
-	ClientIP          string    `json:"client_ip,omitempty"`
-	ResponseCodes     []string  `json:"response_codes,omitempty"`
-	RequestTruncated  bool      `json:"request_truncated,omitempty"`
-	ResponseTruncated bool      `json:"response_truncated,omitempty"`
-	SessionID         string    `json:"session_id,omitempty"`
-	SessionSeq        uint32    `json:"session_seq,omitempty"`
-	Error             string    `json:"error,omitempty"`
+	TraceID           string            `json:"trace_id"`
+	StartedAt         time.Time         `json:"started_at"`
+	DurationMS        int64             `json:"duration_ms"`
+	Protocol          string            `json:"protocol,omitempty"`
+	Operation         string            `json:"operation,omitempty"`
+	AccountID         string            `json:"account_id,omitempty"`
+	Principal         string            `json:"principal,omitempty"`
+	Method            string            `json:"method,omitempty"`
+	Path              string            `json:"path,omitempty"`
+	Status            int32             `json:"status,omitempty"`
+	RequestBytes      int64             `json:"request_bytes,omitempty"`
+	ResponseBytes     int64             `json:"response_bytes,omitempty"`
+	UserAgent         string            `json:"user_agent,omitempty"`
+	ClientIP          string            `json:"client_ip,omitempty"`
+	ResponseCodes     []string          `json:"response_codes,omitempty"`
+	RequestTruncated  bool              `json:"request_truncated,omitempty"`
+	ResponseTruncated bool              `json:"response_truncated,omitempty"`
+	SessionID         string            `json:"session_id,omitempty"`
+	SessionSeq        uint32            `json:"session_seq,omitempty"`
+	Error             string            `json:"error,omitempty"`
 	Streamed          bool              `json:"streamed,omitempty"`
 	Labels            map[string]string `json:"labels,omitempty"`
 	RequestRedacted   bool              `json:"request_redacted,omitempty"`
 	ResponseRedacted  bool              `json:"response_redacted,omitempty"`
 	Offset            int64             `json:"offset"`
-	Length            int64     `json:"length"`
-	File              string    `json:"file"`
+	Length            int64             `json:"length"`
+	File              string            `json:"file"`
 }
 
 func indexEntryFrom(ex *tracev1.HTTPExchange, file string, offset, length int64) *indexEntry {
