@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Go.dev API Documentation
+    url: https://pkg.go.dev/github.com/pilab-cloud/pitrace
+    about: Comprehensive API documentation.
+  - name: Discussions
+    url: https://github.com/pilab-cloud/pitrace/discussions
+    about: Questions and usage help.
+  - name: Security
+    url: https://github.com/pilab-cloud/pitrace/security/advisories/new
+    about: Report a vulnerability privately.

@@ -502,7 +502,7 @@ func (r *Recorder) shouldRecord(operation string) bool {
 			return true
 		}
 	}
-	return rand.Float64() < r.cfg.SampleRatio
+	return rand.Float64() < r.cfg.SampleRatio //nolint:gosec // non-cryptographic sampling is acceptable here
 }
 
 func (r *Recorder) nextSessionSeq(sessionID string) uint32 {

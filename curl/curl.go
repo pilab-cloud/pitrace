@@ -10,6 +10,8 @@ import (
 	tracev1 "go.pilab.hu/cloud/pitrace/gen/trace/v1"
 )
 
+const httpMethodGet = "GET"
+
 // ProtoToCurl renders an HTTPExchange as a replayable curl command.
 func ProtoToCurl(ex *tracev1.HTTPExchange) string {
 	if ex == nil || ex.Summary == nil {
@@ -31,9 +33,7 @@ func ProtoToCurl(ex *tracev1.HTTPExchange) string {
 	}
 	if len(ex.GetRequestBody()) > 0 {
 		body := ex.GetRequestBody()
-		if ex.GetRequestBodyGzipped() {
-			// leave as-is; user can decompress if needed
-		}
+		// Leave gzipped bodies as-is; the user can decompress if needed.
 		b.WriteString(" \\\n  --data-binary '")
 		b.WriteString(string(body))
 		b.WriteString("'")
@@ -141,7 +141,7 @@ func ParseCurl(cmd string) (*http.Request, error) {
 	if !strings.HasPrefix(cmd, "curl") {
 		return nil, fmt.Errorf("not a curl command")
 	}
-	method := "GET"
+	method := httpMethodGet
 	urlStr := ""
 	headers := http.Header{}
 	var body string
@@ -167,7 +167,7 @@ func ParseCurl(cmd string) (*http.Request, error) {
 			i++
 			if i < len(parts) {
 				body = parts[i]
-				if method == "GET" {
+				if method == httpMethodGet {
 					method = "POST"
 				}
 			}
