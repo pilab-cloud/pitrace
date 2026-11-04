@@ -16,3 +16,12 @@ repos:
         language: system
         files: \.go$
         pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: commitlint
+        name: commitlint
+        entry: go run github.com/paalgyula/commitlint@latest lint
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
