@@ -2,3 +2,4 @@
 set -euo pipefail
 
 go run github.com/paalgyula/commitlint@latest lint "$1"
+
