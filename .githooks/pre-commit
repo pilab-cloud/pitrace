@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> gofmt"
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+  echo "gofmt needed:"
+  echo "$unformatted"
+  exit 1
+fi
+
+echo "==> golangci-lint (fast mode)"
+golangci-lint run --fast-only

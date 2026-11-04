@@ -41,5 +41,8 @@ in the index and searchable via `ListTracesRequest.labels`.
 ## Module
 
 `go.pilab.hu/cloud/pitrace`
-EOF
-echo done
+
+## Documentation
+
+Full API reference: [docs/api.md](docs/api.md). Generated Go documentation is
+available via `go doc ./...` and (once published) on pkg.go.dev.
