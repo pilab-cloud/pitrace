@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package pitrace.trace.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "go.pilab.hu/cloud/pitrace/gen/trace/v1;tracev1";
+
+// TraceService is the read side of the request recorder. Daemons that enable
+// tracing serve it on a loopback-only gRPC port; pimail-cli talks to it so no
+// diagnostic ever needs direct access to the trace files.
+service TraceService {
+  // ListTraces returns metadata for matching exchanges, newest first. Bodies
+  // are never returned here.
+  rpc ListTraces(ListTracesRequest) returns (ListTracesResponse);
+  // GetTrace returns one exchange, optionally with the captured bodies.
+  rpc GetTrace(GetTraceRequest) returns (GetTraceResponse);
+  // TailTraces follows live summaries (no bodies) as they are recorded.
+  rpc TailTraces(TailTracesRequest) returns (stream TailTracesResponse);
+}
+
+// ClientInfo identifies the client behind one exchange. Nothing here is
+// protocol specific: HTTP gateways fill it from headers and TLS state, and
+// other adapters may fill it from their own handshake.
+message ClientInfo {
+  string user_agent = 1;
+  // RemoteAddr is the socket peer, which is usually the reverse proxy.
+  string remote_addr = 2;
+  // RealIP/ForwardedFor keep the client address the proxy saw.
+  string real_ip = 3;
+  string forwarded_for = 4;
+  // Version is a protocol-supplied client version (EWS RequestServerVersion,
+  // JMAP session version, IMAP ID, ...).
+  string version = 5;
+  // Fingerprint groups requests from the same client build:
+  // sha256(user_agent|version) truncated to 16 hex characters.
+  string fingerprint = 6;
+}
+
+// WellKnownHeader enumerates common headers so they can be stored as a compact
+// integer instead of a repeated string (saves space on the wire and on disk).
+enum WellKnownHeader {
+  WELL_KNOWN_HEADER_UNSPECIFIED = 0;
+  WELL_KNOWN_HEADER_CONTENT_TYPE = 1;
+  WELL_KNOWN_HEADER_CONTENT_ENCODING = 2;
+  WELL_KNOWN_HEADER_CONTENT_LENGTH = 3;
+  WELL_KNOWN_HEADER_ACCEPT = 4;
+  WELL_KNOWN_HEADER_USER_AGENT = 5;
+  WELL_KNOWN_HEADER_SOAP_ACTION = 6;
+  WELL_KNOWN_HEADER_MS_AS_PROTOCOL_VERSION = 7;
+  WELL_KNOWN_HEADER_X_FORWARDED_FOR = 8;
+  WELL_KNOWN_HEADER_X_REAL_IP = 9;
+  WELL_KNOWN_HEADER_X_REQUEST_ID = 10;
+  WELL_KNOWN_HEADER_X_PIMAIL_TRACE_ID = 11;
+  WELL_KNOWN_HEADER_ACCEPT_ENCODING = 12;
+  WELL_KNOWN_HEADER_AUTHORIZATION = 13;
+  WELL_KNOWN_HEADER_COOKIE = 14;
+  WELL_KNOWN_HEADER_SET_COOKIE = 15;
+  WELL_KNOWN_HEADER_HOST = 16;
+  WELL_KNOWN_HEADER_REFERER = 17;
+  WELL_KNOWN_HEADER_CACHE_CONTROL = 18;
+}
+
+// Header is one selected request or response header. Recorders store an
+// allowlist, never credentials, cookies or authorization data.
+message Header {
+  // well_known is set when the header maps to a known entry (compact form).
+  WellKnownHeader well_known = 1;
+  // name carries the original header name when well_known is UNSPECIFIED or
+  // when the recorder is configured to preserve original casing.
+  string name = 2;
+  string value = 3;
+}
+
+// TraceSummary is the indexable part of an exchange: enough to find and
+// triage a request without loading its body.
+message TraceSummary {
+  string trace_id = 1;
+  google.protobuf.Timestamp started_at = 2;
+  int64 duration_ms = 3;
+  // protocol is "ews", "eas", "jmap", "dav", "autodiscover", "http", ...
+  string protocol = 4;
+  // operation is the protocol operation (EWS action, JMAP method, ...). HTTP
+  // handlers that have no operation leave it empty.
+  string operation = 5;
+  string account_id = 6;
+  string principal = 7;
+  string method = 8;
+  string path = 9;
+  int32 status = 10;
+  int64 request_bytes = 11;
+  int64 response_bytes = 12;
+  string user_agent = 13;
+  string client_ip = 14;
+  repeated string response_codes = 15;
+  bool request_truncated = 16;
+  bool response_truncated = 17;
+  // session_id groups calls made by one client/account/IP, and session_seq
+  // orders them inside that session.
+  string session_id = 18;
+  uint32 session_seq = 19;
+  string error = 20;
+  // streamed marks long-lived responses (SSE, EWS GetStreamingEvents).
+  bool streamed = 21;
+  // labels are searchable metadata attached to the exchange.
+  map<string, string> labels = 22;
+  // redacted flags indicate bodies were replaced with a placeholder.
+  bool request_redacted = 23;
+  bool response_redacted = 24;
+}
+
+// HTTPExchange is one recorded request/response pair. Bodies are the exact
+// bytes the handler read/wrote (capped by the recorder), so a replay is a
+// plain HTTP request with request_body as the payload.
+message HTTPExchange {
+  // schema_version lets readers understand old segments forever.
+  uint32 schema_version = 1;
+  TraceSummary summary = 2;
+  string query = 3;
+  string content_type = 4;
+  ClientInfo client = 5;
+  repeated Header request_headers = 6;
+  repeated Header response_headers = 7;
+  bytes request_body = 8;
+  bytes response_body = 9;
+  // Content hashes make repeated polling requests deduplicable.
+  string request_sha256 = 10;
+  string response_sha256 = 11;
+  // dedup_of names the previous trace whose payload this record repeats.
+  string dedup_of = 12;
+  // Original content encoding of the request/response bodies (if any).
+  string request_content_encoding = 13;
+  string response_content_encoding = 14;
+  // True when the stored body was gzip-compressed by the recorder to save space.
+  bool request_body_gzipped = 15;
+  bool response_body_gzipped = 16;
+}
+
+message ListTracesRequest {
+  google.protobuf.Timestamp since = 1;
+  google.protobuf.Timestamp until = 2;
+  string protocol = 3;
+  string account_id = 4;
+  string operation = 5;
+  // min_status/max_status filter on the HTTP status (0,0 = any).
+  int32 min_status = 6;
+  int32 max_status = 7;
+  string session_id = 8;
+  // text matches path, operation, user agent and response codes.
+  string text = 9;
+  // limit defaults to 100 and is capped at 1000.
+  uint32 limit = 10;
+  uint32 offset = 11;
+  // labels filters exchanges whose labels contain all given key/value pairs.
+  map<string, string> labels = 12;
+}
+
+message ListTracesResponse {
+  repeated TraceSummary traces = 1;
+  uint32 total = 2;
+}
+
+message GetTraceRequest {
+  string trace_id = 1;
+  // include_bodies defaults to true; list/triage callers can turn it off.
+  optional bool include_bodies = 2;
+}
+
+message GetTraceResponse {
+  HTTPExchange trace = 1;
+}
+
+message TailTracesResponse {
+  TraceSummary trace = 1;
+}
+
+message TailTracesRequest {
+  string protocol = 1;
+  string account_id = 2;
+  // backlog replays the last N summaries before following live traffic.
+  uint32 backlog = 3;
+}
