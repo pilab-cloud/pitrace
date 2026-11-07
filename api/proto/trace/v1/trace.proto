@@ -7,7 +7,7 @@ import "google/protobuf/timestamp.proto";
 option go_package = "go.pilab.hu/cloud/pitrace/gen/trace/v1;tracev1";
 
 // TraceService is the read side of the request recorder. Daemons that enable
-// tracing serve it on a loopback-only gRPC port; pimail-cli talks to it so no
+// tracing serve it on a loopback-only gRPC port; CLI tools talk to it so no
 // diagnostic ever needs direct access to the trace files.
 service TraceService {
   // ListTraces returns metadata for matching exchanges, newest first. Bodies

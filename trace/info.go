@@ -6,11 +6,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// TraceIDHeader is set on every recorded response. A user can quote it in a
-// bug report and support can load the exact request/response pair.
-const TraceIDHeader = "X-PiMail-Trace-Id"
+// TraceIDHeader is the default name of the response header carrying the trace
+// id. A user can quote it in a bug report and support can load the exact
+// request/response pair. Override it with Config.TraceIDHeader.
+const TraceIDHeader = "X-Trace-Id"
 
-const infoContextKey = "pimail.trace.info"
+const infoContextKey = "pitrace.info"
 
 // Info is the protocol-neutral context a handler attaches to the exchange.
 // The middleware creates it before the handler runs and reads it afterwards;
@@ -32,6 +33,17 @@ type Info struct {
 	Streamed bool
 	// Labels are searchable metadata attached to the exchange.
 	Labels map[string]string
+	// Error is a failure the handler did not return as an error (for example
+	// a proxy upstream failure that was answered with a 502).
+	Error string
+}
+
+// AddLabel adds a single label.
+func (i *Info) AddLabel(key, value string) {
+	if i.Labels == nil {
+		i.Labels = make(map[string]string)
+	}
+	i.Labels[key] = value
 }
 
 // InfoFrom returns the exchange info for c, creating it when the middleware is

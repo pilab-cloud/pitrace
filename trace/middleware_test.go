@@ -260,7 +260,7 @@ func exClientVersion(t *testing.T, rec *Recorder, traceID string) string {
 
 func TestResponseCaptureFlushForwarding(t *testing.T) {
 	under := httptest.NewRecorder()
-	capture := newResponseCapture(under, 1024)
+	capture := newResponseCapture(under, 1024, nil)
 	_, ok := any(capture).(http.Flusher)
 	assert.True(t, ok, "streaming handlers require Flusher on the wrapped writer")
 	capture.WriteHeader(http.StatusOK)
@@ -282,4 +282,17 @@ func TestNewServiceRejectsEmptyTraceID(t *testing.T) {
 	svc := NewService(nil)
 	_, err := svc.GetTrace(context.Background(), &tracev1.GetTraceRequest{})
 	require.Error(t, err)
+}
+
+func TestMiddlewareCustomTraceIDHeader(t *testing.T) {
+	rec := testRecorder(t, func(c *Config) { c.TraceIDHeader = "X-Request-Trace" })
+	e := echo.New()
+	e.Use(rec.Middleware())
+	e.GET("/", func(c echo.Context) error { return c.String(http.StatusOK, "ok") })
+
+	w := httptest.NewRecorder()
+	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	assert.NotEmpty(t, w.Header().Get("X-Request-Trace"))
+	assert.Empty(t, w.Header().Get(TraceIDHeader))
 }

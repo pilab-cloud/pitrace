@@ -12,9 +12,13 @@ type Config struct {
 	// Enabled turns recording on. Off by default: traces contain mail bodies.
 	Enabled bool `mapstructure:"enabled"`
 
-	// Dir is the root of the trace segments. Defaults to
-	// /var/lib/pimail/trace.
+	// Dir is the root of the trace segments. Defaults to /var/lib/pitrace.
 	Dir string `mapstructure:"dir"`
+
+	// TraceIDHeader names the response header that carries the trace id.
+	// Defaults to TraceIDHeader ("X-Trace-Id"). It is added to the default
+	// header allowlist automatically.
+	TraceIDHeader string `mapstructure:"trace_id_header"`
 
 	// GRPCEndpoint is the loopback address of the read API. The daemon starts
 	// it when Enabled is true; empty means 127.0.0.1:9460.
@@ -52,12 +56,20 @@ type Config struct {
 	HeaderNameMode string `mapstructure:"header_name_mode"`
 
 	// MaxRequestBodyBytes caps how many request body bytes are read (hard cap
-	// via MaxBytesReader). 0 disables the hard cap.
+	// via MaxBytesReader; larger requests get a 413). 0 means the 64 MiB
+	// default and a negative value disables the cap, which a proxy that
+	// streams bodies to a collector should do.
 	MaxRequestBodyBytes int64 `mapstructure:"max_request_body_bytes"`
 	// MaxResponseBodyBytes caps response body capture buffer.
 	MaxResponseBodyBytes int64 `mapstructure:"max_response_body_bytes"`
+	// StreamThresholdBytes is the size above which an opaque body (not JSON,
+	// form or text; no content encoding) is streamed to a remote collector
+	// while it passes instead of being captured in memory. Smaller bodies, and
+	// every body that needs masking, stay inline. Defaults to 256 KiB.
+	StreamThresholdBytes int64 `mapstructure:"stream_threshold_bytes"`
 
-	// StorageType selects the backend: "file" (default) or "s3".
+	// StorageType selects the backend: "file" (default), "s3" or "remote"
+	// (stream to a hackergate collector).
 	StorageType string `mapstructure:"storage_type"`
 	// S3 settings (used when StorageType == "s3").
 	S3Endpoint  string `mapstructure:"s3_endpoint"`
@@ -67,14 +79,31 @@ type Config struct {
 	S3Prefix    string `mapstructure:"s3_prefix"`
 	S3UseSSL    bool   `mapstructure:"s3_use_ssl"`
 
+	// Collector settings (used when StorageType == "remote").
+	CollectorEndpoint string `mapstructure:"collector_endpoint"`
+	// CollectorInsecure disables TLS to the collector (in-cluster dev only).
+	CollectorInsecure bool `mapstructure:"collector_insecure"`
+	// CollectorCAFile adds a CA bundle for verifying the collector.
+	CollectorCAFile string `mapstructure:"collector_ca_file"`
+	// Source identifies this producer; the collector stamps it onto exchanges.
+	Source Source `mapstructure:"source"`
+
 	// RedactUploads replaces request bodies with a placeholder when the request
 	// looks like a file upload (multipart or large binary payload).
 	RedactUploads bool `mapstructure:"redact_uploads"`
 	// RedactDownloads replaces response bodies with a placeholder for binary
 	// downloads (application/octet-stream, etc.).
 	RedactDownloads bool `mapstructure:"redact_downloads"`
-	// RedactContentTypes lists content types whose bodies are always redacted.
+	// RedactContentTypes lists content types whose bodies are always redacted,
+	// in addition to the built-in binary types that RedactUploads and
+	// RedactDownloads switch on.
 	RedactContentTypes []string `mapstructure:"redact_content_types"`
+	// RedactKeys are case-insensitive substrings of JSON/form field and query
+	// parameter names whose values are masked in stored requests and
+	// responses. Empty means DefaultRedactKeys.
+	RedactKeys []string `mapstructure:"redact_keys"`
+	// DisableKeyRedaction turns field masking off entirely.
+	DisableKeyRedaction bool `mapstructure:"disable_key_redaction"`
 	// RedactThresholdBytes redacts bodies larger than this (0 = disabled).
 	RedactThresholdBytes int64 `mapstructure:"redact_threshold_bytes"`
 }
@@ -94,11 +123,10 @@ var DefaultHeaderAllowlist = []string{
 	"X-Forwarded-For",
 	"X-Real-IP",
 	"X-Request-Id",
-	"X-PiMail-Trace-Id",
 }
 
 const (
-	defaultDir            = "/var/lib/pimail/trace"
+	defaultDir            = "/var/lib/pitrace"
 	defaultGRPCEndpoint   = "127.0.0.1:9460"
 	defaultMaxRequest     = 1 << 20 // 1 MiB
 	defaultMaxResponse    = 2 << 20 // 2 MiB
@@ -113,6 +141,9 @@ const (
 func (c Config) withDefaults() Config {
 	if c.Dir == "" {
 		c.Dir = defaultDir
+	}
+	if c.TraceIDHeader == "" {
+		c.TraceIDHeader = TraceIDHeader
 	}
 	if c.GRPCEndpoint == "" {
 		c.GRPCEndpoint = defaultGRPCEndpoint
@@ -143,11 +174,12 @@ func (c Config) withDefaults() Config {
 	}
 	if len(c.HeaderAllowlist) == 0 {
 		c.HeaderAllowlist = append([]string(nil), DefaultHeaderAllowlist...)
+		c.HeaderAllowlist = append(c.HeaderAllowlist, c.TraceIDHeader)
 	}
 	if c.HeaderNameMode == "" {
 		c.HeaderNameMode = "enum"
 	}
-	if c.MaxRequestBodyBytes <= 0 {
+	if c.MaxRequestBodyBytes == 0 {
 		c.MaxRequestBodyBytes = 64 << 20
 	}
 	if c.MaxResponseBodyBytes <= 0 {
@@ -156,15 +188,8 @@ func (c Config) withDefaults() Config {
 			c.MaxResponseBodyBytes = 2 << 20
 		}
 	}
-	if len(c.RedactContentTypes) == 0 {
-		c.RedactContentTypes = []string{
-			"application/octet-stream",
-			"application/zip",
-			"application/pdf",
-			"image/",
-			"video/",
-			"audio/",
-		}
+	if len(c.RedactKeys) == 0 && !c.DisableKeyRedaction {
+		c.RedactKeys = append([]string(nil), DefaultRedactKeys...)
 	}
 	return c
 }
@@ -179,4 +204,13 @@ func ensureDir(dir string) error {
 
 func segmentDir(root string, t time.Time) string {
 	return filepath.Join(root, t.UTC().Format("2006-01-02"))
+}
+
+// Source identifies the process or pod that produced the exchanges.
+type Source struct {
+	ID        string `mapstructure:"id"`
+	Namespace string `mapstructure:"namespace"`
+	Pod       string `mapstructure:"pod"`
+	Workload  string `mapstructure:"workload"`
+	Node      string `mapstructure:"node"`
 }

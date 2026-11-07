@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package pitrace.trace.v1;
+
+import "google/protobuf/timestamp.proto";
+import "trace/v1/trace.proto";
+
+option go_package = "go.pilab.hu/cloud/pitrace/gen/trace/v1;tracev1";
+
+// IngestService is the write side of the platform: sidecars and daemons stream
+// recorded exchanges to a stateless collector, which stores the bodies in an
+// object store and the metadata in a database. Any number of collectors can
+// run behind one load balancer.
+service IngestService {
+  // Push carries any number of exchanges over one long-lived stream. Per
+  // exchange the client sends one ExchangeBegin followed by exactly
+  // request_body_size bytes of REQUEST chunks and then response_body_size
+  // bytes of RESPONSE chunks. The collector answers with one PushAck per
+  // committed exchange. Delivery is at-least-once: after a reconnect the
+  // client re-sends unacknowledged exchanges and the collector deduplicates by
+  // trace id.
+  rpc Push(stream PushRequest) returns (stream PushAck);
+
+  // PutBody streams one large body into the object store while the sidecar is
+  // still receiving it from the wire: nothing is buffered end to end and the
+  // size is unbounded by gRPC's per-message limit (only by the collector's
+  // max stream size). The exchange that references it later arrives on Push
+  // with request_body_uploaded / response_body_uploaded set.
+  rpc PutBody(stream PutBodyRequest) returns (PutBodyResponse);
+}
+
+// BodyService streams stored bodies back without loading them into one
+// message.
+service BodyService {
+  rpc GetBody(GetBodyRequest) returns (stream BodyChunk);
+}
+
+message PushRequest {
+  oneof msg {
+    // hello must be the first message of a stream.
+    SourceInfo hello = 1;
+    ExchangeBegin begin = 2;
+    BodyChunk chunk = 3;
+  }
+}
+
+// SourceInfo identifies the producer; the collector stamps it onto every
+// exchange as k8s.* / source.* labels (existing labels win).
+message SourceInfo {
+  string source_id = 1;
+  string namespace = 2;
+  string pod = 3;
+  string workload = 4;
+  string node = 5;
+  string version = 6;
+}
+
+message ExchangeBegin {
+  // exchange carries everything except the bodies (request_body and
+  // response_body must be empty; they follow as chunks).
+  HTTPExchange exchange = 1;
+  uint64 request_body_size = 2;
+  uint64 response_body_size = 3;
+  // *_uploaded means the body was already stored through PutBody and its size
+  // is declared above; no chunks follow. The collector verifies the stored
+  // size and keeps the exchange without that body when it does not match.
+  bool request_body_uploaded = 4;
+  bool response_body_uploaded = 5;
+}
+
+message PutBodyRequest {
+  oneof msg {
+    // header must be the first message.
+    PutBodyHeader header = 1;
+    bytes data = 2;
+  }
+}
+
+message PutBodyHeader {
+  string trace_id = 1;
+  BodyKind kind = 2;
+  // started_at of the exchange; together with trace_id it fixes the object
+  // key, so a re-sent upload overwrites itself.
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message PutBodyResponse {
+  uint64 size = 1;
+}
+
+enum BodyKind {
+  BODY_KIND_UNSPECIFIED = 0;
+  BODY_KIND_REQUEST = 1;
+  BODY_KIND_RESPONSE = 2;
+}
+
+message BodyChunk {
+  BodyKind kind = 1;
+  bytes data = 2;
+}
+
+message PushAck {
+  string trace_id = 1;
+  bool stored = 2;
+  string error = 3;
+}
+
+message GetBodyRequest {
+  string trace_id = 1;
+  BodyKind kind = 2;
+}

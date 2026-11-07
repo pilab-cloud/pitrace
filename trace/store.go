@@ -159,6 +159,12 @@ func (e *indexEntry) matches(req *tracev1.ListTracesRequest) bool {
 	return true
 }
 
+// MatchSummary reports whether a summary satisfies the filters of req (the
+// same semantics every storage backend uses).
+func MatchSummary(s *tracev1.TraceSummary, req *tracev1.ListTracesRequest) bool {
+	return indexEntryFrom(&tracev1.HTTPExchange{Summary: s}, "", 0, 0).matches(req)
+}
+
 // List returns index summaries, newest first.
 func indexFiles(root string) []string {
 	var files []string
