@@ -113,6 +113,7 @@ const userAgentHeader = "User-Agent"
 
 // DefaultHeaderAllowlist is deliberately small and credential-free.
 var DefaultHeaderAllowlist = []string{
+	"Host",
 	"Content-Type",
 	"Content-Encoding",
 	"Content-Length",

@@ -198,7 +198,7 @@ func (r *Recorder) finish(req *http.Request, respHeader http.Header, status int,
 		Query:           r.mask.maskQuery(req.URL.RawQuery),
 		ContentType:     req.Header.Get("Content-Type"),
 		Client:          client,
-		RequestHeaders:  selectHeaders(req.Header, r.cfg.HeaderAllowlist, r.cfg.HeaderNameMode),
+		RequestHeaders:  selectHeaders(withHost(req), r.cfg.HeaderAllowlist, r.cfg.HeaderNameMode),
 		ResponseHeaders: selectHeaders(respHeader, r.cfg.HeaderAllowlist, r.cfg.HeaderNameMode),
 	}
 	if reqCapture != nil && reqCapture.streaming() {
@@ -500,6 +500,20 @@ func wellKnownHeader(name string) tracev1.WellKnownHeader {
 		return tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CACHE_CONTROL
 	}
 	return tracev1.WellKnownHeader_WELL_KNOWN_HEADER_UNSPECIFIED
+}
+
+// withHost returns the request headers plus Host, which net/http keeps out of
+// req.Header.
+func withHost(req *http.Request) http.Header {
+	if req.Host == "" {
+		return req.Header
+	}
+	h := req.Header.Clone()
+	if h == nil {
+		h = http.Header{}
+	}
+	h.Set("Host", req.Host)
+	return h
 }
 
 func selectHeaders(h http.Header, allowlist []string, mode string) []*tracev1.Header {

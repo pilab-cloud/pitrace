@@ -79,6 +79,7 @@ func TestMiddlewareCapturesExchange(t *testing.T) {
 	// Credentials must never be copied into a trace.
 	assert.Empty(t, findHeader(ex.GetRequestHeaders(), "Authorization"))
 	assert.Equal(t, "CreateItem", findHeader(ex.GetRequestHeaders(), "SOAPAction"))
+	assert.Equal(t, "example.com", findHeader(ex.GetRequestHeaders(), "Host"))
 }
 
 // A handler that rejects before reading the body (auth failure, bad content
