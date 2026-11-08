@@ -42,3 +42,17 @@ func TestProtoToRequest(t *testing.T) {
 		t.Fatalf("method %s", r2.Method)
 	}
 }
+
+func TestProtoToCurlUsesRecordedScheme(t *testing.T) {
+	ex := &tracev1.HTTPExchange{
+		Summary:        &tracev1.TraceSummary{Method: "GET", Path: "/x", Labels: map[string]string{"scheme": "http"}},
+		RequestHeaders: []*tracev1.Header{{Name: "Host", Value: "svc"}},
+	}
+	if cmd := ProtoToCurl(ex); !strings.Contains(cmd, "'http://svc/x'") {
+		t.Fatalf("want http scheme, got %s", cmd)
+	}
+	delete(ex.Summary.Labels, "scheme")
+	if cmd := ProtoToCurl(ex); !strings.Contains(cmd, "'https://svc/x'") {
+		t.Fatalf("want https default, got %s", cmd)
+	}
+}

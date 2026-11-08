@@ -184,7 +184,7 @@ func (r *Recorder) finish(req *http.Request, respHeader http.Header, status int,
 		SessionId:     sessionID,
 		SessionSeq:    seq,
 		Streamed:      info.Streamed,
-		Labels:        info.Labels,
+		Labels:        withScheme(info.Labels, req),
 	}
 	if handlerErr != nil {
 		summary.Error = handlerErr.Error()
@@ -500,6 +500,25 @@ func wellKnownHeader(name string) tracev1.WellKnownHeader {
 		return tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CACHE_CONTROL
 	}
 	return tracev1.WellKnownHeader_WELL_KNOWN_HEADER_UNSPECIFIED
+}
+
+// withScheme adds the request scheme so a replay can use http for plain
+// traffic. X-Forwarded-Proto wins over the local connection state.
+func withScheme(labels map[string]string, req *http.Request) map[string]string {
+	scheme := "http"
+	if p := req.Header.Get("X-Forwarded-Proto"); p == "http" || p == "https" {
+		scheme = p
+	} else if req.TLS != nil {
+		scheme = "https"
+	}
+	out := make(map[string]string, len(labels)+1)
+	for k, v := range labels {
+		out[k] = v
+	}
+	if _, ok := out["scheme"]; !ok {
+		out["scheme"] = scheme
+	}
+	return out
 }
 
 // withHost returns the request headers plus Host, which net/http keeps out of

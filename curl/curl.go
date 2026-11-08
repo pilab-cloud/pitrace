@@ -70,6 +70,14 @@ func HeaderName(h *tracev1.Header) string {
 	return wellKnownNames[h.GetWellKnown()]
 }
 
+// scheme returns the recorded request scheme, defaulting to https.
+func scheme(s *tracev1.TraceSummary) string {
+	if v := s.GetLabels()["scheme"]; v == "http" || v == "https" {
+		return v
+	}
+	return "https"
+}
+
 func buildURL(s *tracev1.TraceSummary, ex *tracev1.HTTPExchange) string {
 	u := s.GetPath()
 	if ex.GetQuery() != "" {
@@ -83,7 +91,7 @@ func buildURL(s *tracev1.TraceSummary, ex *tracev1.HTTPExchange) string {
 		}
 	}
 	if host != "" {
-		return "https://" + host + u
+		return scheme(s) + "://" + host + u
 	}
 	return u
 }
@@ -109,7 +117,7 @@ func ProtoToRequest(ex *tracev1.HTTPExchange) (*http.Request, error) {
 	}
 	if host != "" {
 		u.Host = host
-		u.Scheme = "https"
+		u.Scheme = scheme(s)
 	}
 	req, err := http.NewRequest(s.GetMethod(), u.String(), bytes.NewReader(ex.GetRequestBody()))
 	if err != nil {
