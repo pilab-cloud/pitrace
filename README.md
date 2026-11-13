@@ -20,7 +20,9 @@ Extracted from pimail's trace subsystem. Provides:
 - Live tail with filtered subscribers
 - Retention pruning
 - Loopback gRPC read API
-- Echo middleware for HTTP capture
+- Echo and net/http middleware for HTTP capture
+- Remote storage client + wire protocols for a hackergate collector
+- `curl` package: render a recorded exchange as a curl command
 
 ## Usage
 
@@ -41,11 +43,38 @@ rec, svc, err := trace.NewBuilder().
 
 ## Storage backends
 - File (shared/NFS): `WithFileStorage()` (default)
-- S3 (MinIO/silo): `WithS3Storage(...)`
+- S3 (MinIO/silo): `WithS3Storage(...)` (one object per record; single writer)
+- Remote (hackergate collector): `WithRemoteStorage(endpoint, insecure, trace.Source{...})`
+
+## net/http middleware
+
+`rec.HTTPMiddleware(opts...)` wraps any `http.Handler`; annotate exchanges via
+`trace.InfoFromRequest(r)`. The client IP is the socket peer unless you pass
+`trace.WithClientIP(...)` (forwarding headers are client-controlled).
+
+## Hackergate pipeline (sidecar, collector, injector, CLI)
+
+The product components built on this library (the `hgsniffer` recording
+proxy, the `hgtrace-collector`, the admission-webhook injector and
+`hgctl trace`) live in the hackergate repository, see its `docs/trace.md`.
+This module provides what they share: the recorder, redaction, the
+`RemoteStorage` client for a collector, and the wire protocols
+(`api/proto/trace/v1/trace.proto` and `ingest.proto`: `IngestService.Push` /
+`PutBody`, `TraceService`, `BodyService`).
+
+Use `WithRemoteStorage(endpoint, insecure, trace.Source{...})` to stream
+records to a collector. Delivery is at-least-once with a bounded in-memory
+window; when it is full `Write` fails with `ErrCollectorBusy`.
 
 ## Redaction
-Uploads (multipart) and downloads (binary content types) can be redacted;
-large bodies over threshold are also redacted.
+- Secrets are masked by default: values of JSON/form fields and query
+  parameters whose name contains `password`, `token`, `secret`, `api_key`,
+  `authorization`, … (`DefaultRedactKeys`) are stored as `[redacted]`, in
+  requests and responses, including truncated bodies. Tune with
+  `WithRedactKeys(...)` or switch off with `DisableKeyRedaction`.
+- `RedactUploads` / `RedactDownloads` redact multipart and binary
+  (`image/`, `video/`, `audio/`, zip, pdf, octet-stream) bodies.
+- `RedactContentTypes` and `RedactThresholdBytes` always apply.
 
 ## Metadata & search
 Handlers attach labels via `trace.AddLabel(c, key, value)`. Labels are stored

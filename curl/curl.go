@@ -21,24 +21,61 @@ func ProtoToCurl(ex *tracev1.HTTPExchange) string {
 	var b strings.Builder
 	b.WriteString("curl -i -X ")
 	b.WriteString(s.GetMethod())
-	b.WriteString(" '")
-	b.WriteString(buildURL(s, ex))
-	b.WriteString("'")
+	b.WriteString(" ")
+	b.WriteString(shellQuote(buildURL(s, ex)))
 	for _, h := range ex.GetRequestHeaders() {
-		b.WriteString(" \\\n  -H '")
-		b.WriteString(h.GetName())
-		b.WriteString(": ")
-		b.WriteString(h.GetValue())
-		b.WriteString("'")
+		b.WriteString(" \\\n  -H ")
+		b.WriteString(shellQuote(HeaderName(h) + ": " + h.GetValue()))
 	}
 	if len(ex.GetRequestBody()) > 0 {
 		body := ex.GetRequestBody()
 		// Leave gzipped bodies as-is; the user can decompress if needed.
-		b.WriteString(" \\\n  --data-binary '")
-		b.WriteString(string(body))
-		b.WriteString("'")
+		b.WriteString(" \\\n  --data-binary ")
+		b.WriteString(shellQuote(string(body)))
 	}
 	return b.String()
+}
+
+// shellQuote wraps s in single quotes for a POSIX shell.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+var wellKnownNames = map[tracev1.WellKnownHeader]string{
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CONTENT_TYPE:           "Content-Type",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CONTENT_ENCODING:       "Content-Encoding",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CONTENT_LENGTH:         "Content-Length",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_ACCEPT:                 "Accept",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_USER_AGENT:             "User-Agent",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_SOAP_ACTION:            "SOAPAction",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_MS_AS_PROTOCOL_VERSION: "MS-ASProtocolVersion",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_X_FORWARDED_FOR:        "X-Forwarded-For",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_X_REAL_IP:              "X-Real-IP",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_X_REQUEST_ID:           "X-Request-Id",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_X_PIMAIL_TRACE_ID:      "X-PiMail-Trace-Id",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_ACCEPT_ENCODING:        "Accept-Encoding",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_AUTHORIZATION:          "Authorization",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_COOKIE:                 "Cookie",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_SET_COOKIE:             "Set-Cookie",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_HOST:                   "Host",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_REFERER:                "Referer",
+	tracev1.WellKnownHeader_WELL_KNOWN_HEADER_CACHE_CONTROL:          "Cache-Control",
+}
+
+// HeaderName returns the header's name, resolving the compact well-known form.
+func HeaderName(h *tracev1.Header) string {
+	if h.GetName() != "" {
+		return h.GetName()
+	}
+	return wellKnownNames[h.GetWellKnown()]
+}
+
+// scheme returns the recorded request scheme, defaulting to https.
+func scheme(s *tracev1.TraceSummary) string {
+	if v := s.GetLabels()["scheme"]; v == "http" || v == "https" {
+		return v
+	}
+	return "https"
 }
 
 func buildURL(s *tracev1.TraceSummary, ex *tracev1.HTTPExchange) string {
@@ -49,12 +86,12 @@ func buildURL(s *tracev1.TraceSummary, ex *tracev1.HTTPExchange) string {
 	// Host from headers
 	host := ""
 	for _, h := range ex.GetRequestHeaders() {
-		if strings.EqualFold(h.GetName(), "Host") {
+		if strings.EqualFold(HeaderName(h), "Host") {
 			host = h.GetValue()
 		}
 	}
 	if host != "" {
-		return "https://" + host + u
+		return scheme(s) + "://" + host + u
 	}
 	return u
 }
@@ -74,20 +111,20 @@ func ProtoToRequest(ex *tracev1.HTTPExchange) (*http.Request, error) {
 	}
 	host := ""
 	for _, h := range ex.GetRequestHeaders() {
-		if strings.EqualFold(h.GetName(), "Host") {
+		if strings.EqualFold(HeaderName(h), "Host") {
 			host = h.GetValue()
 		}
 	}
 	if host != "" {
 		u.Host = host
-		u.Scheme = "https"
+		u.Scheme = scheme(s)
 	}
 	req, err := http.NewRequest(s.GetMethod(), u.String(), bytes.NewReader(ex.GetRequestBody()))
 	if err != nil {
 		return nil, err
 	}
 	for _, h := range ex.GetRequestHeaders() {
-		req.Header.Add(h.GetName(), h.GetValue())
+		req.Header.Add(HeaderName(h), h.GetValue())
 	}
 	if host != "" {
 		req.Host = host

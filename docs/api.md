@@ -18,7 +18,7 @@ Import: `go.pilab.hu/cloud/pitrace/trace`
 
 | Name | Value | Description |
 |------|-------|-------------|
-| `TraceIDHeader` | `X-PiMail-Trace-Id` | Set on every recorded response; quote it in bug reports. |
+| `TraceIDHeader` | `X-Trace-Id` | Default trace-id response header name; override with `Config.TraceIDHeader` / `WithTraceIDHeader`. Quote it in bug reports. |
 
 ### Variables
 
@@ -53,7 +53,8 @@ Key fields:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `Enabled` | `bool` | `false` | Turns recording on. |
-| `Dir` | `string` | `/var/lib/pimail/trace` | Root of trace segments. |
+| `Dir` | `string` | `/var/lib/pitrace` | Root of trace segments. |
+| `TraceIDHeader` | `string` | `X-Trace-Id` | Response header carrying the trace id. |
 | `GRPCEndpoint` | `string` | `127.0.0.1:9460` | Loopback read API address. |
 | `MaxRequestBytes` | `int64` | 1 MiB | Cap kept per request body. |
 | `MaxResponseBytes` | `int64` | 2 MiB | Cap kept per response body. |
@@ -70,9 +71,11 @@ Key fields:
 | `MaxResponseBodyBytes` | `int64` | `MaxResponseBytes` | Response capture buffer cap. |
 | `StorageType` | `string` | `file` | `file` or `s3`. |
 | `S3Endpoint` / `S3AccessKey` / `S3SecretKey` / `S3Bucket` / `S3Prefix` / `S3UseSSL` | — | S3 settings. |
-| `RedactUploads` | `bool` | `false` | Redact multipart/large uploads. |
-| `RedactDownloads` | `bool` | `false` | Redact binary downloads. |
-| `RedactContentTypes` | `[]string` | common binary types | Always-redacted content types. |
+| `RedactUploads` | `bool` | `false` | Redact multipart and binary request bodies. |
+| `RedactDownloads` | `bool` | `false` | Redact binary response bodies. |
+| `RedactContentTypes` | `[]string` | empty | Content types that are always redacted (on top of the built-in binary types the two flags enable). |
+| `RedactKeys` | `[]string` | `DefaultRedactKeys` | Name substrings of JSON/form fields and query parameters whose values are masked as `[redacted]`. |
+| `DisableKeyRedaction` | `bool` | `false` | Turn field/parameter masking off. |
 | `RedactThresholdBytes` | `int64` | `0` | Redact bodies larger than this. |
 
 ### `Builder`
@@ -89,7 +92,7 @@ Build:
 - `Build() (*Recorder, error)`
 - `BuildService() (*Recorder, *Service, error)`
 
-All `With*` methods mirror the `Config` fields (`WithDir`, `WithEnabled`, `WithMaxAge`, `WithMaxBytes`, `WithQueueSize`, `WithSampleRatio`, `WithAlwaysOperations`, `WithHeaderAllowlist`, `WithRedactUploads`, `WithRedactDownloads`, `WithRedactContentTypes`, `WithRedactThresholdBytes`, `WithConfig`, `WithLogger`).
+All `With*` methods mirror the `Config` fields (`WithDir`, `WithEnabled`, `WithMaxAge`, `WithMaxBytes`, `WithQueueSize`, `WithSampleRatio`, `WithAlwaysOperations`, `WithHeaderAllowlist`, `WithRedactUploads`, `WithRedactDownloads`, `WithRedactContentTypes`, `WithRedactKeys`, `WithRedactThresholdBytes`, `WithConfig`, `WithLogger`).
 
 ### `Recorder`
 

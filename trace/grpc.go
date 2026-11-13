@@ -12,7 +12,7 @@ import (
 )
 
 // Service is the gRPC read side of a Recorder. Daemons serve it on a
-// loopback-only port; pimail-cli uses it so no tool reads trace files directly.
+// loopback-only port; CLI tools use it so no tool reads trace files directly.
 type Service struct {
 	tracev1.UnimplementedTraceServiceServer
 

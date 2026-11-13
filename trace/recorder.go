@@ -34,8 +34,10 @@ type Recorder struct {
 	seq   map[string]uint32
 
 	// Live tail state, written by the writer goroutine.
-	ringMu sync.RWMutex
-	ring   []*tracev1.TraceSummary
+	ringMu    sync.RWMutex
+	ring      [defaultRingSize]*tracev1.TraceSummary
+	ringNext  int // slot the next summary is written to
+	ringCount int
 
 	subsMu sync.RWMutex
 	subs   map[*subscriber]struct{}
@@ -43,6 +45,8 @@ type Recorder struct {
 	// Dedup state.
 	mu   sync.Mutex
 	last map[string]lastHashes
+
+	mask *keyMasker
 
 	storage Storage
 	now     func() time.Time
@@ -82,13 +86,23 @@ func NewRecorder(cfg Config, logger zerolog.Logger) (*Recorder, error) {
 	switch cfg.StorageType {
 	case "s3":
 		st, err = NewS3Storage(cfg, logger, cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket, cfg.S3Prefix, cfg.S3UseSSL)
+	case "remote":
+		st, err = NewRemoteStorage(cfg, logger)
 	default:
 		st, err = NewFileStorage(cfg, logger)
 	}
 	if err != nil {
 		return nil, err
 	}
+	return NewRecorderWithStorage(cfg, logger, st)
+}
 
+// NewRecorderWithStorage builds a recorder on a caller-supplied backend.
+func NewRecorderWithStorage(cfg Config, logger zerolog.Logger, st Storage) (*Recorder, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
+	cfg = cfg.withDefaults()
 	r := &Recorder{
 		cfg:     cfg,
 		log:     logger,
@@ -98,6 +112,9 @@ func NewRecorder(cfg Config, logger zerolog.Logger) (*Recorder, error) {
 		last:    make(map[string]lastHashes),
 		storage: st,
 		now:     time.Now,
+	}
+	if !cfg.DisableKeyRedaction {
+		r.mask = newKeyMasker(cfg.RedactKeys)
 	}
 	r.wg.Add(1)
 	go r.writeLoop()
@@ -245,9 +262,10 @@ func (r *Recorder) publish(summary *tracev1.TraceSummary) {
 		return
 	}
 	r.ringMu.Lock()
-	r.ring = append(r.ring, summary)
-	if len(r.ring) > defaultRingSize {
-		r.ring = append([]*tracev1.TraceSummary(nil), r.ring[len(r.ring)-defaultRingSize:]...)
+	r.ring[r.ringNext] = summary
+	r.ringNext = (r.ringNext + 1) % defaultRingSize
+	if r.ringCount < defaultRingSize {
+		r.ringCount++
 	}
 	r.ringMu.Unlock()
 
@@ -304,7 +322,10 @@ func (r *Recorder) Tail(ctx context.Context, protocol, account string, backlog i
 
 	if backlog > 0 {
 		r.ringMu.RLock()
-		recent := append([]*tracev1.TraceSummary(nil), r.ring...)
+		recent := make([]*tracev1.TraceSummary, 0, r.ringCount)
+		for i := r.ringCount; i > 0; i-- {
+			recent = append(recent, r.ring[(r.ringNext-i+defaultRingSize)%defaultRingSize])
+		}
 		r.ringMu.RUnlock()
 		start := len(recent) - backlog
 		if start < 0 {
@@ -321,8 +342,10 @@ func (r *Recorder) Tail(ctx context.Context, protocol, account string, backlog i
 	}
 
 	var once sync.Once
+	done := make(chan struct{})
 	cancel := func() {
 		once.Do(func() {
+			close(done)
 			r.subsMu.Lock()
 			if _, ok := r.subs[sub]; ok {
 				delete(r.subs, sub)
@@ -332,46 +355,13 @@ func (r *Recorder) Tail(ctx context.Context, protocol, account string, backlog i
 		})
 	}
 	go func() {
-		<-ctx.Done()
-		cancel()
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-done:
+		}
 	}()
 	return sub.ch, cancel
-}
-
-// shouldRedact decides whether a body should be replaced with a placeholder.
-func (r *Recorder) shouldRedact(contentType string, size int64, cfg Config, upload bool) bool {
-	ct := strings.ToLower(contentType)
-	if upload && cfg.RedactUploads {
-		if strings.HasPrefix(ct, "multipart/") {
-			return true
-		}
-	}
-	if !upload && cfg.RedactDownloads {
-		for _, p := range cfg.RedactContentTypes {
-			p = strings.ToLower(p)
-			if strings.HasSuffix(p, "/") {
-				if strings.HasPrefix(ct, p) {
-					return true
-				}
-			} else if ct == p {
-				return true
-			}
-		}
-	}
-	for _, p := range cfg.RedactContentTypes {
-		p = strings.ToLower(p)
-		if strings.HasSuffix(p, "/") {
-			if strings.HasPrefix(ct, p) {
-				return true
-			}
-		} else if ct == p {
-			return true
-		}
-	}
-	if cfg.RedactThresholdBytes > 0 && size > cfg.RedactThresholdBytes {
-		return true
-	}
-	return false
 }
 
 // Prune delegates to storage.

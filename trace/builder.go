@@ -29,6 +29,9 @@ func (b *Builder) WithLogger(l zerolog.Logger) *Builder { b.logger = l; return b
 // WithDir sets the root directory of the trace segments.
 func (b *Builder) WithDir(dir string) *Builder { b.cfg.Dir = dir; return b }
 
+// WithTraceIDHeader sets the response header that carries the trace id.
+func (b *Builder) WithTraceIDHeader(name string) *Builder { b.cfg.TraceIDHeader = name; return b }
+
 // WithEnabled turns recording on or off.
 func (b *Builder) WithEnabled(v bool) *Builder { b.cfg.Enabled = v; return b }
 
@@ -65,6 +68,13 @@ func (b *Builder) WithRedactContentTypes(ct ...string) *Builder {
 	return b
 }
 
+// WithRedactKeys sets the field/parameter name substrings whose values are
+// masked (default DefaultRedactKeys).
+func (b *Builder) WithRedactKeys(keys ...string) *Builder {
+	b.cfg.RedactKeys = keys
+	return b
+}
+
 // WithRedactThresholdBytes redacts bodies larger than n (0 disables).
 func (b *Builder) WithRedactThresholdBytes(n int64) *Builder {
 	b.cfg.RedactThresholdBytes = n
@@ -74,6 +84,35 @@ func (b *Builder) WithRedactThresholdBytes(n int64) *Builder {
 // File backend (default)
 func (b *Builder) WithFileStorage() *Builder {
 	b.cfg.StorageType = "file"
+	return b
+}
+
+// WithRemoteStorage streams exchanges to a hackergate collector.
+func (b *Builder) WithRemoteStorage(endpoint string, insecure bool, src Source) *Builder {
+	b.cfg.StorageType = "remote"
+	b.cfg.CollectorEndpoint = endpoint
+	b.cfg.CollectorInsecure = insecure
+	b.cfg.Source = src
+	return b
+}
+
+// WithCollectorCA verifies the collector against an extra CA bundle.
+func (b *Builder) WithCollectorCA(path string) *Builder {
+	b.cfg.CollectorCAFile = path
+	return b
+}
+
+// WithMaxRequestBody caps request bodies (413 above it); a negative value
+// removes the cap, 0 keeps the default.
+func (b *Builder) WithMaxRequestBody(n int64) *Builder {
+	b.cfg.MaxRequestBodyBytes = n
+	return b
+}
+
+// WithStreamThreshold sets the size above which opaque bodies are streamed to
+// the collector instead of being captured in memory.
+func (b *Builder) WithStreamThreshold(n int64) *Builder {
+	b.cfg.StreamThresholdBytes = n
 	return b
 }
 
